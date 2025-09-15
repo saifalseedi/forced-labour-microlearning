@@ -721,10 +721,10 @@
       
       const overallProgress = useMemo(() => {
         const totalModules = COURSE_DATA.modules.length || 1;
-        const uniqueCompleted = Array.from(new Set(completedModules)).length;
-        const pct = Math.round((uniqueCompleted / totalModules) * 100);
+        const completedCount = COURSE_DATA.modules.reduce((acc, _m, i) => acc + (moduleProgress?.[i]?.completed ? 1 : 0), 0);
+        const pct = Math.round((completedCount / totalModules) * 100);
         return Math.max(0, Math.min(100, pct));
-      }, [completedModules]);
+      }, [moduleProgress]);
 
       const handleModuleSelect = (moduleIndex) => {
         setCurrentModule(moduleIndex);
@@ -859,7 +859,7 @@
                   <ModuleCard
                     key={module.id}
                     module={module}
-                    isCompleted={completedModules.includes(index)}
+                    isCompleted={!!moduleProgress?.[index]?.completed}
                     isCurrent={index === currentModule}
                     onClick={() => handleModuleSelect(index)}
                   />
@@ -890,6 +890,14 @@
                       <li>• Policy makers and regulators</li>
                     </ul>
                   </div>
+                </div>
+                <div className="mt-4">
+                  <button
+                    onClick={() => setProgress({ completedModules: [], moduleProgress: {}, notes: {}, quizAnswers: {}, completionDate: null, userName: userName || '', quizScore: 0 })}
+                    className="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-sm"
+                  >
+                    Reset Progress
+                  </button>
                 </div>
               </div>
             </div>
@@ -1011,13 +1019,13 @@
                 addScore={addScore}
                 onComplete={() => {
                   // mark module completed after quiz
-                  const newCompletedModules = [...completedModules];
-                  if (!newCompletedModules.includes(currentModule)) newCompletedModules.push(currentModule);
-                  setProgress({
-                    ...progress,
-                    completedModules: newCompletedModules,
-                    moduleProgress: { ...moduleProgress, [currentModule]: { completedCards: (COURSE_DATA.modules[currentModule]?.cards.length || 0) } }
-                  });
+                  setProgress(prev => ({
+                    ...prev,
+                    moduleProgress: { 
+                      ...prev.moduleProgress, 
+                      [currentModule]: { completed: true, completedCards: (COURSE_DATA.modules[currentModule]?.cards.length || 0) } 
+                    }
+                  }));
                   if (currentModule < COURSE_DATA.modules.length - 1) {
                     setCurrentModule(currentModule + 1);
                     setCurrentCard(0);
