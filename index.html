@@ -39,12 +39,14 @@
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 </head>
 <body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 min-h-screen">
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect, useMemo, useCallback } = React;
+    const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
     // Enhanced localStorage hook with error handling
     function useLocalStorage(key, initialValue) {
@@ -347,6 +349,9 @@
       ]
     ];
 
+    // Total quiz questions across modules → used for scoring (100 points total)
+    const TOTAL_QUIZ_QUESTIONS = QUIZ_SETS.reduce((sum, set) => sum + (set?.length || 0), 0) || 1;
+
     // Simple sound feedback via Web Audio API
     function playTone(type) {
       try {
@@ -561,14 +566,15 @@
     });
 
     // Five-question timed quiz flow
-    function TimedQuiz({ moduleIndex, onComplete }) {
-      const questions = QUIZ_SETS[moduleIndex] || [];
+    function TimedQuiz({ moduleIndex, onComplete, addScore }) {
+      const questions = (QUIZ_SETS[moduleIndex] || []).slice(0, 5);
       const [qIndex, setQIndex] = useState(0);
       const [picked, setPicked] = useState(null);
-      const [seconds, setSeconds] = useState(60);
+      const [seconds, setSeconds] = useState(30);
       const [locked, setLocked] = useState(false);
+      const pointsPerQuestion = 100 / TOTAL_QUIZ_QUESTIONS;
 
-      useEffect(() => { setSeconds(60); setPicked(null); setLocked(false); }, [qIndex]);
+      useEffect(() => { setSeconds(30); setPicked(null); setLocked(false); }, [qIndex]);
 
       useEffect(() => {
         if (locked) return;
@@ -588,6 +594,7 @@
         setLocked(true);
         const isCorrect = i === questions[qIndex].answerIndex;
         playTone(isCorrect ? 'correct' : 'wrong');
+        if (isCorrect && typeof addScore === 'function') addScore(pointsPerQuestion);
       };
 
       const handleNext = () => {
@@ -644,13 +651,73 @@
         moduleProgress: {},
         notes: {},
         quizAnswers: {},
-        completionDate: null
+        completionDate: null,
+        userName: '',
+        quizScore: 0
       });
 
-      const { completedModules, moduleProgress, notes, quizAnswers } = progress;
+      const { completedModules, moduleProgress, notes, quizAnswers, userName, quizScore } = progress;
 
       const currentModuleData = COURSE_DATA.modules[currentModule];
       const currentCardData = currentModuleData?.cards[currentCard];
+      const addScore = useCallback((points) => {
+        setProgress(prev => ({ ...prev, quizScore: Math.min(100, (prev.quizScore || 0) + points) }));
+      }, [setProgress]);
+
+      
+      // Certificate capture ref and handler (must be declared at top-level to satisfy React Hooks rules)
+      const certRef = useRef(null);
+      const downloadCertificate = useCallback(async () => {
+        try {
+          const el = certRef.current;
+          if (!el) return;
+          const oldBg = el.style.backgroundColor;
+          el.style.backgroundColor = '#ffffff';
+          const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+          el.style.backgroundColor = oldBg;
+          const imgData = canvas.toDataURL('image/png');
+          const { jsPDF } = window.jspdf;
+          const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          const pageHeight = pdf.internal.pageSize.getHeight();
+          const imgWidth = pageWidth - 80;
+          const imgHeight = (canvas.height * imgWidth) / canvas.width;
+          const y = Math.max(40, (pageHeight - imgHeight) / 2);
+          pdf.addImage(imgData, 'PNG', 40, y, imgWidth, imgHeight);
+          pdf.save('Erasmus-Forced-Labour-Certificate.pdf');
+        } catch (e) {
+          console.error('Certificate download failed', e);
+          alert('Could not generate certificate. Please try again.');
+        }
+      }, []);
+
+      const shareCertificate = useCallback(async () => {
+        try {
+          const el = certRef.current;
+          if (!el) return;
+          const oldBg = el.style.backgroundColor;
+          el.style.backgroundColor = '#ffffff';
+          const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+          el.style.backgroundColor = oldBg;
+          const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+          if (navigator.share && blob) {
+            const file = new File([blob], 'certificate.png', { type: 'image/png' });
+            await navigator.share({
+              title: 'Erasmus+ Forced Labour Training Certificate',
+              text: `I completed the course with a score of ${Math.round(quizScore)}/100.`,
+              files: [file]
+            });
+          } else if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(window.location.href);
+            alert('Link copied to clipboard. Share it with your friends!');
+          } else {
+            alert('Sharing is not supported on this device.');
+          }
+        } catch (e) {
+          console.error('Share failed', e);
+          alert('Could not share the certificate.');
+        }
+      }, [quizScore]);
       
       const overallProgress = useMemo(() => {
         const totalModules = COURSE_DATA.modules.length || 1;
@@ -771,6 +838,18 @@
                     <div className="text-2xl font-bold text-gray-900">{COURSE_DATA.modules.length}</div>
                     <p className="text-sm text-gray-600">Total Modules</p>
                   </div>
+                </div>
+
+                <div className="max-w-md mx-auto mb-8 bg-white/70 backdrop-blur rounded-xl p-4 border border-gray-200">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Your name for the certificate</label>
+                  <input
+                    type="text"
+                    value={userName || ''}
+                    onChange={(e) => setProgress({ ...progress, userName: e.target.value })}
+                    placeholder="Enter your full name"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">This will appear on your course certificate.</p>
                 </div>
               </div>
 
@@ -929,6 +1008,7 @@
               </button>
               <TimedQuiz 
                 moduleIndex={currentModule}
+                addScore={addScore}
                 onComplete={() => {
                   // mark module completed after quiz
                   const newCompletedModules = [...completedModules];
@@ -957,27 +1037,38 @@
         return (
           <div className="min-h-screen p-6 bg-gradient-to-br from-green-50 to-blue-50">
             <div className="max-w-2xl mx-auto">
-              <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-lg text-center">
+              <div ref={certRef} className="bg-white rounded-2xl p-8 border border-gray-200 shadow-lg text-center">
                 <div className="w-20 h-20 bg-green-600 rounded-full flex items-center justify-center text-white text-3xl mx-auto mb-6">
                   🏆
                 </div>
                 
-                <h1 className="text-3xl font-bold text-gray-900 mb-4">Congratulations!</h1>
-                <p className="text-lg text-gray-600 mb-6">
-                  You have successfully completed the Erasmus+ Forced Labour Training Course
-                </p>
-                
-                <div className="bg-gray-50 rounded-lg p-6 mb-6">
-                  <h2 className="text-xl font-semibold mb-4">Course Completion Certificate</h2>
-                  <div className="space-y-2 text-sm text-gray-600">
-                    <p><span className="font-medium">Course:</span> {COURSE_DATA.title}</p>
-                    <p><span className="font-medium">Duration:</span> {COURSE_DATA.duration}</p>
-                    <p><span className="font-medium">Modules Completed:</span> {COURSE_DATA.modules.length}</p>
-                    <p><span className="font-medium">Completion Date:</span> {new Date().toLocaleDateString()}</p>
-                  </div>
-                </div>
-                
-                <div className="flex gap-4 justify-center">
+                {Math.round(quizScore) >= 70 ? (
+                  <>
+                    <h1 className="text-3xl font-bold text-gray-900 mb-4">Congratulations!</h1>
+                    <p className="text-lg text-gray-600 mb-6">You passed the Erasmus+ Forced Labour Training Course</p>
+                    <div className="bg-gray-50 rounded-lg p-6 mb-2">
+                      <h2 className="text-xl font-semibold mb-4">Course Completion Certificate</h2>
+                      <div className="space-y-2 text-sm text-gray-600">
+                        {userName && (<p><span className="font-medium">Awarded to:</span> {userName}</p>)}
+                        <p><span className="font-medium">Score:</span> {Math.round(quizScore)}/100</p>
+                        <p><span className="font-medium">Course:</span> {COURSE_DATA.title}</p>
+                        <p><span className="font-medium">Duration:</span> {COURSE_DATA.duration}</p>
+                        <p><span className="font-medium">Modules Completed:</span> {COURSE_DATA.modules.length}</p>
+                        <p><span className="font-medium">Completion Date:</span> {new Date().toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex items-center justify-center gap-3">
+                      <button onClick={downloadCertificate} disabled={!userName} className="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">Download Certificate</button>
+                      <button onClick={shareCertificate} className="px-5 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50">Share</button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <h1 className="text-3xl font-bold text-gray-900 mb-4">Keep Going</h1>
+                    <p className="text-lg text-gray-600 mb-6">You scored {Math.round(quizScore)}/100. You need at least 70 to earn the certificate.</p>
+                  </>
+                )}
+                <div className="mt-6">
                   <button
                     onClick={() => {
                       setCurrentView('overview');
@@ -986,16 +1077,7 @@
                     }}
                     className="px-6 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
                   >
-                    Review Course
-                  </button>
-                  <button
-                    onClick={() => {
-                      // In a real app, this would generate and download a PDF certificate
-                      alert('Certificate download feature would be implemented here');
-                    }}
-                    className="px-6 py-3 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
-                  >
-                    Download Certificate
+                    Home
                   </button>
                 </div>
               </div>
