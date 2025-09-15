@@ -3,8 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Interactive microlearning about forced labour - learn about signs, prevention, and action steps" />
-  <title>Forced Labour — Microlearning</title>
+  <meta name="description" content="Erasmus+ Forced Labour Training Course - Interactive microlearning platform for understanding forced labour, supply chains, and prevention strategies" />
+  <title>Erasmus+ Forced Labour Training Course</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="preconnect" href="https://unpkg.com">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -12,26 +15,38 @@
     body { 
       -webkit-font-smoothing: antialiased; 
       -moz-osx-font-smoothing: grayscale;
+      font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji';
     }
-    .card-transition { transition: opacity 0.25s ease-in-out, transform 0.25s ease-in-out; }
-    :focus { outline: 3px solid rgba(0,0,0,0.9); outline-offset: 3px; }
+    .card-transition { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    .card-hover { transition: all 0.2s ease-in-out; }
+    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); }
+    :focus-visible { outline: 3px solid rgba(59, 130, 246, 0.6); outline-offset: 3px; }
+    .erasmus-gradient { background: linear-gradient(135deg, #003399 0%, #0066cc 50%, #0099ff 100%); }
+    .erasmus-accent { background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%); }
+    .module-card { background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%); }
+    .progress-ring { transform: rotate(-90deg); }
+    .flip-card { perspective: 1000px; }
+    .flip-card-inner { transition: transform 0.6s; transform-style: preserve-3d; }
+    .flip-card.flipped .flip-card-inner { transform: rotateY(180deg); }
+    .flip-card-front, .flip-card-back { backface-visibility: hidden; }
+    .flip-card-back { transform: rotateY(180deg); }
     @media (prefers-color-scheme: dark) {
-      body { background: #0b1220; color: #e6eef8; }
-      .card { background: #071126; }
-      .muted { color: #9aa8bf; }
+      body { background: #0f172a; color: #f1f5f9; }
+      .module-card { background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%); }
+      .card { background: #1e293b; border-color: #334155; }
     }
   </style>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
-<body class="bg-white text-gray-900">
+<body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 min-h-screen">
   <div id="root"></div>
 
   <script type="text/babel">
     const { useState, useEffect, useMemo, useCallback } = React;
 
-    // localStorage hook for persistence
+    // Enhanced localStorage hook with error handling
     function useLocalStorage(key, initialValue) {
       const [state, setState] = useState(() => {
         try {
@@ -52,176 +67,947 @@
       return [state, setState];
     }
 
-    // LESSONS data (kept inline so the file remains a single static page)
-    const LESSONS = [
-      {
-        id: "m1",
-        title: "01 · what is forced labour?",
-        estMin: 5,
-        cards: [
-          {
-            type: "text",
-            heading: "quick take",
-            body: "forced labour = work that people can’t refuse or leave because of threats, debt, deception, or restriction of movement. short: no real choice, not fair pay, not safe."
-          },
-          {
-            type: "text",
-            heading: "why this matters",
-            body: "it hides in supply chains: clothes, food, electronics. youth can spot signals + push for better."
-          },
-          {
-            type: "quiz",
-            question: "which is a red flag?",
-            options: [
-              "clear contract in language i understand",
-              "passport taken ‘for safety’",
-              "paid overtime recorded and optional"
-            ],
-            answerIndex: 1,
-            explain: "keeping passports is a classic coercion tactic — big red flag."
-          },
-          {
-            type: "reflect",
-            prompt: "what products in your day could touch risky supply chains? write 3. (phone, t-shirt, tomatoes…)"
-          },
-          {
-            type: "action",
-            heading: "mini to‑do",
-            checklist: [
-              "read a worker story from a trusted ngo",
-              "learn 1 brand code of conduct + 1 loophole",
-              "share 1 fact with a friend (60s talk)"
-            ]
-          }
-        ]
-      },
-      {
-        id: "m2",
-        title: "02 · spot the signs",
-        estMin: 6,
-        cards: [
-          {
-            type: "text",
-            heading: "signs (not a full list)",
-            body: "id/passport kept, recruitment fees, debt bondage, threats, movement limits, forced overtime, unsafe housing, wages withheld."
-          },
-          {
-            type: "quiz",
-            question: "a recruiter demands a ‘placement fee’. okay or not?",
-            options: ["normal cost", "not okay — risk of debt bondage"],
-            answerIndex: 1,
-            explain: "fees put workers in debt → more control by employer/recruiter."
-          },
-          {
-            type: "text",
-            heading: "what you can safely do",
-            body: "learn signals, support orgs who help workers, ask brands for proof (not just promises). always keep safety + consent."
-          },
-          {
-            type: "reflect",
-            prompt: "in your city, where might risk appear (sectors/seasonal work)? list 2–3."
-          }
-        ]
-      },
-      {
-        id: "m3",
-        title: "03 · from phone to farm (mapping)",
-        estMin: 7,
-        cards: [
-          {
-            type: "text",
-            heading: "map it",
-            body: "pick 1 product. trace: raw material → factory → brand → store → you. where can harm sneak in?"
-          },
-          {
-            type: "osint",
-            heading: "quick check",
-            steps: [
-              "read label (country/cert marks)",
-              "google: ‘<brand> forced labour case’",
-              "find brand supplier list (if public)"
-            ]
-          },
-          {
-            type: "quiz",
-            question: "a brand says ‘we have zero tolerance’. what next?",
-            options: [
-              "trust and move on",
-              "ask: audits? remediation? worker voice? proof?"
-            ],
-            answerIndex: 1,
-            explain: "policy ≠ practice. look for evidence and worker‑led remedies."
-          }
-        ]
-      },
-      {
-        id: "m4",
-        title: "04 · people resisting",
-        estMin: 5,
-        cards: [
-          {
-            type: "text",
-            heading: "human rights defenders",
-            body: "workers, unions, ngos, journalists. they push back. youth can amplify + support safely."
-          },
-          {
-            type: "action",
-            heading: "support",
-            checklist: [
-              "follow 1 worker‑led org",
-              "learn what ‘remediation’ means (not just cutting suppliers)",
-              "share a verified case with context (no doxxing)"
-            ]
-          }
-        ]
-      },
-      {
-        id: "m5",
-        title: "05 · do something now",
-        estMin: 6,
-        cards: [
-          {
-            type: "choice",
-            heading: "pick your path",
-            choices: [
-              { key: "video", label: "make a 60–90s explainer video" },
-              { key: "toolkit", label: "write 1 mini activity for classmates" },
-              { key: "campaign", label: "post a 3‑tile info set (story/feed)" },
-              { key: "workshop", label: "host a 30‑min micro‑workshop" }
-            ]
-          },
-          {
-            type: "action",
-            heading: "deliverables",
-            checklist: [
-              "define 1 message (12 words max)",
-              "add 1 source (ngo/journal)",
-              "add captions/alt text"
-            ]
-          },
-          {
-            type: "reflect",
-            prompt: "who will you reach this week? write 2 names + 1 place (school, youth club…)."
-          }
-        ]
-      }
+    // Enhanced course data structure for Erasmus+ training
+    const COURSE_DATA = {
+      title: "Erasmus+ Forced Labour Training Course",
+      subtitle: "Understanding Modern Slavery in Global Supply Chains",
+      duration: "10-15 Minutes",
+      modules: [
+        {
+          id: "module-1",
+          title: "Understanding Forced Labour",
+          subtitle: "Foundations and Definitions",
+          duration: "30 min",
+          icon: "📚",
+          color: "blue",
+          objectives: [
+            "Define forced labour according to ILO standards",
+            "Identify different forms of modern slavery",
+            "Understand the scope and scale globally"
+          ],
+          cards: [
+            {
+              type: "definition",
+              title: "What is Forced Labour?",
+              content: "Forced labour is work that people cannot refuse or leave because of threats, violence, coercion, deception, or restriction of movement. It violates fundamental human rights and international labour standards.",
+              source: "ILO Convention No. 29 (1930)"
+            },
+            {
+              type: "quiz",
+              question: "According to ILO standards, which situation constitutes forced labour?",
+              options: [
+                "Working overtime without additional pay",
+                "Having your passport confiscated by employer",
+                "Being paid minimum wage",
+                "Working in difficult conditions"
+              ],
+              answerIndex: 1,
+              explanation: "Confiscating identity documents is a clear indicator of forced labour as it restricts workers' freedom of movement and ability to leave."
+            },
+            {
+              type: "statistics",
+              title: "Global Scale",
+              content: "An estimated 27.6 million people are in forced labour worldwide, with 3.3 million being children. This affects every region and industry.",
+              source: "ILO Global Estimates 2021"
+            },
+            {
+              type: "reflection",
+              prompt: "Think about products you use daily. Which industries might be most vulnerable to forced labour in their supply chains?",
+              placeholder: "Consider electronics, clothing, food, construction..."
+            }
+          ]
+        },
+        {
+          id: "module-2",
+          title: "Identifying Risk Factors",
+          subtitle: "Signs and Vulnerabilities",
+          duration: "35 min",
+          icon: "🔍",
+          color: "orange",
+          objectives: [
+            "Recognize red flags and warning signs",
+            "Understand vulnerable populations",
+            "Learn about recruitment practices"
+          ],
+          cards: [
+            {
+              type: "warning-signs",
+              title: "Red Flags to Watch For",
+              content: "Key indicators include: confiscated documents, recruitment fees, debt bondage, threats or violence, restricted movement, excessive working hours, unsafe conditions, and withheld wages.",
+              checklist: [
+                "Identity documents taken",
+                "Recruitment fees charged",
+                "Debt to employer/recruiter",
+                "Threats or intimidation",
+                "Restricted movement",
+                "Excessive overtime",
+                "Unsafe working conditions",
+                "Wages withheld"
+              ]
+            },
+            {
+              type: "quiz",
+              question: "A migrant worker pays a recruitment fee of €2,000 to get a job. Is this normal?",
+              options: [
+                "Yes, recruitment fees are standard practice",
+                "No, this creates debt bondage risk",
+                "It depends on the country",
+                "Only if the fee is reasonable"
+              ],
+              answerIndex: 1,
+              explanation: "Recruitment fees create debt bondage situations where workers cannot leave due to financial obligations, increasing forced labour risk."
+            },
+            {
+              type: "vulnerable-groups",
+              title: "Most Vulnerable Populations",
+              content: "Migrant workers, refugees, women and children, indigenous peoples, and those in informal sectors are disproportionately affected by forced labour.",
+              groups: [
+                { name: "Migrant Workers", risk: "High", reason: "Language barriers, unfamiliar laws" },
+                { name: "Women & Girls", risk: "High", reason: "Gender discrimination, domestic work" },
+                { name: "Children", risk: "Critical", reason: "Legal protection gaps" },
+                { name: "Refugees", risk: "High", reason: "Desperate circumstances" }
+              ]
+            }
+          ]
+        },
+        {
+          id: "module-3",
+          title: "Supply Chain Mapping",
+          subtitle: "From Raw Materials to Consumer",
+          duration: "40 min",
+          icon: "🌍",
+          color: "green",
+          objectives: [
+            "Map typical supply chains",
+            "Identify risk points",
+            "Learn due diligence processes"
+          ],
+          cards: [
+            {
+              type: "supply-chain",
+              title: "Mapping Your Supply Chain",
+              content: "Every product has a complex journey: raw materials → processing → manufacturing → distribution → retail → consumer. Risk can occur at any stage.",
+              stages: [
+                { stage: "Raw Materials", risks: ["Child labour", "Debt bondage"], examples: ["Mining", "Agriculture"] },
+                { stage: "Processing", risks: ["Forced overtime", "Document confiscation"], examples: ["Factories", "Processing plants"] },
+                { stage: "Manufacturing", risks: ["Recruitment fees", "Restricted movement"], examples: ["Assembly lines", "Textile production"] },
+                { stage: "Distribution", risks: ["Exploitation", "Poor conditions"], examples: ["Warehousing", "Transportation"] }
+              ]
+            },
+            {
+              type: "case-study",
+              title: "Case Study: Electronics Industry",
+              content: "A smartphone contains minerals from multiple countries, assembled in factories with complex subcontracting networks. Each component represents potential risk points.",
+              analysis: [
+                "Cobalt mining in DRC - child labour risks",
+                "Rare earth processing in China - environmental and labour concerns",
+                "Assembly in Southeast Asia - migrant worker vulnerabilities",
+                "Global distribution - complex logistics chains"
+              ]
+            },
+            {
+              type: "due-diligence",
+              title: "Due Diligence Framework",
+              content: "Organizations should implement comprehensive due diligence processes to identify, prevent, and address forced labour risks.",
+              steps: [
+                "Risk assessment and mapping",
+                "Policy development and implementation",
+                "Supplier engagement and capacity building",
+                "Monitoring and verification",
+                "Remediation and grievance mechanisms"
+              ]
+            }
+          ]
+        },
+        {
+          id: "module-4",
+          title: "Legal Framework",
+          subtitle: "International Standards and National Laws",
+          duration: "30 min",
+          icon: "⚖️",
+          color: "purple",
+          objectives: [
+            "Understand international legal framework",
+            "Learn about national legislation",
+            "Know reporting and remediation requirements"
+          ],
+          cards: [
+            {
+              type: "legal-framework",
+              title: "International Legal Framework",
+              content: "Multiple international instruments address forced labour, creating obligations for states and businesses.",
+              instruments: [
+                { name: "ILO Convention No. 29", year: "1930", focus: "Forced Labour Convention" },
+                { name: "ILO Convention No. 105", year: "1957", focus: "Abolition of Forced Labour" },
+                { name: "UN Protocol to Prevent Trafficking", year: "2000", focus: "Trafficking in Persons" },
+                { name: "UN Guiding Principles on Business", year: "2011", focus: "Human Rights Due Diligence" }
+              ]
+            },
+            {
+              type: "national-laws",
+              title: "National Legislation Examples",
+              content: "Many countries have enacted specific laws requiring businesses to address forced labour in their operations and supply chains.",
+              examples: [
+                { country: "UK", law: "Modern Slavery Act 2015", requirement: "Annual transparency statements" },
+                { country: "Australia", law: "Modern Slavery Act 2018", requirement: "Mandatory reporting" },
+                { country: "Germany", law: "Supply Chain Due Diligence Act", requirement: "Due diligence obligations" },
+                { country: "EU", law: "Corporate Sustainability Due Diligence", requirement: "Comprehensive due diligence" }
+              ]
+            }
+          ]
+        },
+        {
+          id: "module-5",
+          title: "Prevention and Action",
+          subtitle: "Building Ethical Supply Chains",
+          duration: "35 min",
+          icon: "🛡️",
+          color: "red",
+          objectives: [
+            "Learn prevention strategies",
+            "Understand remediation approaches",
+            "Develop action plans"
+          ],
+          cards: [
+            {
+              type: "prevention-strategies",
+              title: "Prevention Strategies",
+              content: "Effective prevention requires multi-stakeholder approaches involving businesses, governments, civil society, and workers themselves.",
+              strategies: [
+                "Strengthen legal frameworks and enforcement",
+                "Improve recruitment practices and eliminate fees",
+                "Enhance worker voice and representation",
+                "Increase transparency and traceability",
+                "Build capacity and awareness"
+              ]
+            },
+            {
+              type: "remediation",
+              title: "Remediation Approaches",
+              content: "When forced labour is identified, appropriate remediation should prioritize the rights and needs of affected workers.",
+              approaches: [
+                "Immediate removal from forced labour situation",
+                "Access to justice and legal support",
+                "Compensation for unpaid wages and damages",
+                "Psychosocial support and rehabilitation",
+                "Prevention of re-victimization"
+              ]
+            },
+            {
+              type: "action-planning",
+              title: "Your Action Plan",
+              content: "Develop concrete steps you can take in your role to address forced labour risks.",
+              categories: [
+                { area: "Personal", actions: ["Research supply chains", "Support ethical brands", "Raise awareness"] },
+                { area: "Professional", actions: ["Implement policies", "Train staff", "Engage suppliers"] },
+                { area: "Community", actions: ["Support NGOs", "Advocate for change", "Share knowledge"] }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+
+    // Five-question quiz sets per module (ensure 5 each)
+    const QUIZ_SETS = [
+      [
+        { question: "Which is a key element of forced labour?", options: ["Voluntary overtime", "Free movement", "Coercion or threats", "High salary"], answerIndex: 2, explanation: "Coercion, threats, or deception remove real choice." },
+        { question: "Keeping a worker's passport is…", options: ["Good security practice", "A red flag for forced labour", "Only illegal for minors", "Always allowed with consent"], answerIndex: 1, explanation: "Document confiscation restricts freedom of movement." },
+        { question: "ILO Convention No. 29 focuses on…", options: ["Child education", "Forced labour", "Trade tariffs", "Environmental law"], answerIndex: 1, explanation: "Convention No. 29 addresses forced labour." },
+        { question: "One sign that choice is not free is…", options: ["Written contract", "Debt to recruiter", "Paid leave", "Language support"], answerIndex: 1, explanation: "Debt bondage is a classic coercion mechanism." },
+        { question: "Modern slavery includes…", options: ["Fair internships", "Debt bondage", "Union organizing", "Sick leave"], answerIndex: 1, explanation: "Debt bondage is a form of modern slavery." }
+      ],
+      [
+        { question: "Recruitment fees lead to…", options: ["Better jobs", "Debt bondage risk", "Higher wages", "Shorter hours"], answerIndex: 1, explanation: "Fees can trap workers in debt and coercion." },
+        { question: "Which is NOT a red flag?", options: ["Withheld wages", "Restricted movement", "Safety training", "Threats of deportation"], answerIndex: 2, explanation: "Safety training is good; others signal risk." },
+        { question: "Vulnerable groups often include…", options: ["CEOs", "Migrant workers", "Tourists", "Diplomats"], answerIndex: 1, explanation: "Migrant workers face structural vulnerabilities." },
+        { question: "A sign at housing says 'No leaving after 8pm' for workers. This is…", options: ["Normal curfew", "Potential restriction of movement", "Team-building", "Cultural norm"], answerIndex: 1, explanation: "Restrictions indicate control over movement." },
+        { question: "Paying for a job is…", options: ["Acceptable if cheap", "A major warning sign", "Required in EU", "Only wrong for minors"], answerIndex: 1, explanation: "No worker should pay to access work." }
+      ],
+      [
+        { question: "Supply chains have risk at…", options: ["Only retail", "Only factories", "Multiple stages", "No stages"], answerIndex: 2, explanation: "Risk exists from raw materials to retail." },
+        { question: "Raw material stage risks include…", options: ["Debt bondage", "Flexible hours", "Union bonuses", "Paid holidays"], answerIndex: 0, explanation: "Mining/agriculture can include debt bondage." },
+        { question: "Due diligence includes…", options: ["Supplier engagement", "Ignoring complaints", "Secrecy", "Cutting all suppliers"], answerIndex: 0, explanation: "Engage suppliers to improve practices." },
+        { question: "A component supplier not disclosed is…", options: ["Higher transparency", "Traceability gap", "Compliance proof", "Certification"], answerIndex: 1, explanation: "Undisclosed tiers create blind spots." },
+        { question: "Effective monitoring should be…", options: ["One-time", "Worker-informed", "Secretive", "Only remote"], answerIndex: 1, explanation: "Worker voice is critical for monitoring." }
+      ],
+      [
+        { question: "UN Guiding Principles require…", options: ["Profit maximization", "Human rights due diligence", "Trade sanctions", "No reporting"], answerIndex: 1, explanation: "They define corporate HRDD expectations." },
+        { question: "Modern Slavery Acts typically require…", options: ["Annual transparency statements", "New taxes", "Tariff reductions", "Private policing"], answerIndex: 0, explanation: "Reporting on risks and actions is required." },
+        { question: "ILO C105 focuses on…", options: ["Abolition of forced labour", "Fishing safety", "Equal pay", "Maritime law"], answerIndex: 0, explanation: "C105 complements C29 on abolition." },
+        { question: "A grievance mechanism should be…", options: ["Hidden", "Retaliatory", "Accessible and safe", "Expensive"], answerIndex: 2, explanation: "Safe access enables remediation." },
+        { question: "National laws increasingly mandate…", options: ["No oversight", "Due diligence obligations", "Secrecy", "No records"], answerIndex: 1, explanation: "Many jurisdictions require HRDD." }
+      ],
+      [
+        { question: "Prevention includes…", options: ["Charging fees", "Strengthening recruitment standards", "Withholding pay", "Silencing workers"], answerIndex: 1, explanation: "Fair recruitment reduces risk." },
+        { question: "Remediation prioritizes…", options: ["Profit", "Worker rights and needs", "Brand image", "Share price"], answerIndex: 1, explanation: "Center affected workers in remedies." },
+        { question: "Transparency improves via…", options: ["Traceability", "Fewer records", "No audits", "Silence"], answerIndex: 0, explanation: "Traceability reveals risk points." },
+        { question: "Worker voice means…", options: ["Retaliation", "Representation and feedback", "Isolation", "Gag orders"], answerIndex: 1, explanation: "Voice enables safer workplaces." },
+        { question: "An action plan should be…", options: ["Vague", "Specific and time-bound", "Secret", "Punitive"], answerIndex: 1, explanation: "Clarity drives accountability." }
+      ]
     ];
 
-    // Progress bar with ARIA
-    const ProgressBar = React.memo(function ProgressBar({ value, max }) {
-      const pct = Math.round((value / Math.max(1, max)) * 100);
+    // Simple sound feedback via Web Audio API
+    function playTone(type) {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        const now = ctx.currentTime;
+        if (type === 'correct') { o.frequency.value = 880; g.gain.setValueAtTime(0.001, now); g.gain.exponentialRampToValueAtTime(0.2, now + 0.01); g.gain.exponentialRampToValueAtTime(0.001, now + 0.25); }
+        else if (type === 'wrong') { o.frequency.value = 220; g.gain.setValueAtTime(0.001, now); g.gain.exponentialRampToValueAtTime(0.2, now + 0.01); g.gain.exponentialRampToValueAtTime(0.001, now + 0.35); }
+        else if (type === 'timeout') { o.frequency.value = 440; g.gain.setValueAtTime(0.001, now); g.gain.exponentialRampToValueAtTime(0.2, now + 0.01); g.gain.exponentialRampToValueAtTime(0.001, now + 0.6); }
+        o.start(); o.stop(now + 0.65);
+      } catch (e) { /* no audio available */ }
+    }
+
+    // Enhanced Progress Component
+    const ProgressRing = React.memo(function ProgressRing({ progress, size = 60, strokeWidth = 4 }) {
+      const radius = (size - strokeWidth) / 2;
+      const circumference = radius * 2 * Math.PI;
+      const strokeDasharray = circumference;
+      const strokeDashoffset = circumference - (progress / 100) * circumference;
+
       return (
-        <div role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-          <div className="h-full bg-black/80 transition-all" style={{ width: pct + '%' }} />
+        <div className="relative inline-flex items-center justify-center">
+          <svg width={size} height={size} className="progress-ring">
+            <circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              stroke="currentColor"
+              strokeWidth={strokeWidth}
+              fill="transparent"
+              className="text-gray-200"
+            />
+            <circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              stroke="currentColor"
+              strokeWidth={strokeWidth}
+              fill="transparent"
+              strokeDasharray={strokeDasharray}
+              strokeDashoffset={strokeDashoffset}
+              className="text-blue-600 transition-all duration-300 ease-in-out"
+              style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
+            />
+          </svg>
+          <span className="absolute text-sm font-semibold text-gray-700">{Math.round(progress)}%</span>
         </div>
       );
     });
 
-    const Badge = React.memo(function Badge({ children }) {
-      return <span className="px-2 py-0.5 text-xs rounded-full bg-gray-100 border border-gray-200">{children}</span>;
+    // Module Card Component
+    const ModuleCard = React.memo(function ModuleCard({ module, isCompleted, isCurrent, onClick }) {
+      const colorClasses = {
+        blue: "from-blue-500 to-blue-600",
+        orange: "from-orange-500 to-orange-600", 
+        green: "from-green-500 to-green-600",
+        purple: "from-purple-500 to-purple-600",
+        red: "from-red-500 to-red-600"
+      };
+
+      return (
+        <div 
+          className={`module-card card-hover p-6 rounded-xl border-2 cursor-pointer ${
+            isCurrent ? 'border-blue-500 shadow-lg' : 'border-gray-200'
+          } ${isCompleted ? 'opacity-75' : ''}`}
+          onClick={onClick}
+        >
+          <div className="flex items-start justify-between mb-4">
+            <div className={`w-12 h-12 rounded-lg bg-gradient-to-r ${colorClasses[module.color]} flex items-center justify-center text-white text-xl`}>
+              {module.icon}
+            </div>
+            <div className="flex items-center gap-2">
+              {isCompleted && <span className="text-green-600 text-sm font-medium">✓ Completed</span>}
+              <span className="text-sm text-gray-500">{module.duration}</span>
+            </div>
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">{module.title}</h3>
+          <p className="text-sm text-gray-600 mb-3">{module.subtitle}</p>
+          <div className="space-y-1">
+            {module.objectives.slice(0, 2).map((objective, index) => (
+              <p key={index} className="text-xs text-gray-500">• {objective}</p>
+            ))}
+            {module.objectives.length > 2 && (
+              <p className="text-xs text-gray-400">+{module.objectives.length - 2} more objectives</p>
+            )}
+          </div>
+        </div>
+      );
     });
 
-    // Error boundary for better error handling
+    // Enhanced Card Components
+    const DefinitionCard = React.memo(function DefinitionCard({ card }) {
+      return (
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-200">
+          <div className="flex items-start gap-4">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+              DEF
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">{card.title}</h3>
+              <p className="text-gray-700 leading-relaxed mb-4">{card.content}</p>
+              <div className="bg-white p-3 rounded-lg border-l-4 border-blue-500">
+                <p className="text-sm text-gray-600">
+                  <span className="font-medium">Source:</span> {card.source}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    });
+
+    const QuizCard = React.memo(function QuizCard({ card, userAnswer, onAnswer }) {
+      const [showExplanation, setShowExplanation] = useState(false);
+      
+      useEffect(() => {
+        if (userAnswer !== null) {
+          setShowExplanation(true);
+        }
+      }, [userAnswer]);
+
+      return (
+        <div className="bg-white p-6 rounded-xl border border-gray-200">
+          <div className="flex items-start gap-4 mb-6">
+            <div className="w-8 h-8 bg-orange-600 rounded-lg flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+              QUIZ
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Knowledge Check</h3>
+              <p className="text-gray-700 leading-relaxed">{card.question}</p>
+            </div>
+          </div>
+          
+          <div className="space-y-3 mb-4">
+            {card.options.map((option, index) => {
+              const isSelected = userAnswer === index;
+              const isCorrect = index === card.answerIndex;
+              const showResult = userAnswer !== null;
+              
+              let buttonClass = "w-full text-left p-4 rounded-lg border-2 transition-all duration-200 ";
+              
+              if (showResult) {
+                if (isCorrect) {
+                  buttonClass += "border-green-500 bg-green-50 text-green-800";
+                } else if (isSelected && !isCorrect) {
+                  buttonClass += "border-red-500 bg-red-50 text-red-800";
+                } else {
+                  buttonClass += "border-gray-200 bg-gray-50 text-gray-600";
+                }
+              } else {
+                buttonClass += "border-gray-200 hover:border-orange-300 hover:bg-orange-50";
+              }
+
+              return (
+                <button
+                  key={index}
+                  onClick={() => onAnswer(index)}
+                  disabled={showResult}
+                  className={buttonClass}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                      showResult 
+                        ? (isCorrect ? 'border-green-500 bg-green-500 text-white' : 
+                           isSelected ? 'border-red-500 bg-red-500 text-white' : 'border-gray-300')
+                        : 'border-gray-300'
+                    }`}>
+                      {showResult && isCorrect && '✓'}
+                      {showResult && isSelected && !isCorrect && '✗'}
+                    </div>
+                    <span>{option}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {showExplanation && (
+            <div className="bg-gray-50 p-4 rounded-lg border-l-4 border-orange-500">
+              <p className="text-sm text-gray-700">
+                <span className="font-medium">Explanation:</span> {card.explanation}
+              </p>
+            </div>
+          )}
+        </div>
+      );
+    });
+
+    const ReflectionCard = React.memo(function ReflectionCard({ card, userNotes, onNotesChange }) {
+      return (
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-xl border border-green-200">
+          <div className="flex items-start gap-4 mb-4">
+            <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+              REF
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Reflection Exercise</h3>
+              <p className="text-gray-700 leading-relaxed mb-4">{card.prompt}</p>
+              <textarea
+                className="w-full p-4 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
+                rows="4"
+                placeholder={card.placeholder || "Share your thoughts..."}
+                value={userNotes || ''}
+                onChange={(e) => onNotesChange(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+      );
+    });
+
+    // Five-question timed quiz flow
+    function TimedQuiz({ moduleIndex, onComplete }) {
+      const questions = QUIZ_SETS[moduleIndex] || [];
+      const [qIndex, setQIndex] = useState(0);
+      const [picked, setPicked] = useState(null);
+      const [seconds, setSeconds] = useState(60);
+      const [locked, setLocked] = useState(false);
+
+      useEffect(() => { setSeconds(60); setPicked(null); setLocked(false); }, [qIndex]);
+
+      useEffect(() => {
+        if (locked) return;
+        if (seconds <= 0) {
+          setLocked(true);
+          playTone('timeout');
+          setTimeout(() => handleNext(), 600);
+          return;
+        }
+        const id = setTimeout(() => setSeconds(s => s - 1), 1000);
+        return () => clearTimeout(id);
+      }, [seconds, locked]);
+
+      const handlePick = (i) => {
+        if (locked) return;
+        setPicked(i);
+        setLocked(true);
+        const isCorrect = i === questions[qIndex].answerIndex;
+        playTone(isCorrect ? 'correct' : 'wrong');
+      };
+
+      const handleNext = () => {
+        if (qIndex < questions.length - 1) setQIndex(qIndex + 1); else onComplete();
+      };
+
+      if (!questions.length) return <div className="p-6 bg-white rounded-xl border">No quiz available.</div>;
+      const q = questions[qIndex];
+
+      return (
+        <div className="bg-white p-6 rounded-xl border border-gray-200">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Module Quiz</h3>
+              <p className="text-sm text-gray-600">Question {qIndex + 1} of {questions.length}</p>
+            </div>
+            <div className={`px-3 py-1 rounded-full text-sm font-medium ${seconds <= 10 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>{seconds}s</div>
+          </div>
+          <p className="mb-4 text-gray-800">{q.question}</p>
+          <div className="space-y-3 mb-4">
+            {q.options.map((opt, i) => {
+              const isCorrect = i === q.answerIndex;
+              const isSelected = picked === i;
+              let cls = "w-full text-left p-4 rounded-lg border-2 transition-colors ";
+              if (!locked) cls += "border-gray-200 hover:border-blue-300 hover:bg-blue-50";
+              else if (isCorrect) cls += "border-green-500 bg-green-50";
+              else if (isSelected && !isCorrect) cls += "border-red-500 bg-red-50";
+              else cls += "border-gray-200 bg-gray-50";
+              return (
+                <button key={i} disabled={locked} onClick={() => handlePick(i)} className={cls}>{opt}</button>
+              );
+            })}
+          </div>
+          {locked && (
+            <div className="bg-gray-50 p-3 rounded-lg border-l-4 border-blue-500 text-sm text-gray-700 mb-3">
+              {picked == null ? 'Time is up.' : (picked === q.answerIndex ? 'Correct.' : 'Not quite.')} {q.explanation}
+            </div>
+          )}
+          <div className="flex justify-end">
+            <button onClick={handleNext} disabled={!locked} className="px-5 py-2 rounded-lg bg-blue-600 text-white disabled:opacity-50">{qIndex === questions.length - 1 ? 'Finish Quiz' : 'Next'}</button>
+          </div>
+        </div>
+      );
+    }
+
+    // Main App Component
+    function ErasmusTrainingApp() {
+      const [currentView, setCurrentView] = useState('overview'); // 'overview', 'module', 'quiz', 'certificate'
+      const [currentModule, setCurrentModule] = useState(0);
+      const [currentCard, setCurrentCard] = useState(0);
+      
+      const [progress, setProgress] = useLocalStorage('erasmus-training-progress', {
+        completedModules: [],
+        moduleProgress: {},
+        notes: {},
+        quizAnswers: {},
+        completionDate: null
+      });
+
+      const { completedModules, moduleProgress, notes, quizAnswers } = progress;
+
+      const currentModuleData = COURSE_DATA.modules[currentModule];
+      const currentCardData = currentModuleData?.cards[currentCard];
+      
+      const overallProgress = useMemo(() => {
+        const totalModules = COURSE_DATA.modules.length || 1;
+        const uniqueCompleted = Array.from(new Set(completedModules)).length;
+        const pct = Math.round((uniqueCompleted / totalModules) * 100);
+        return Math.max(0, Math.min(100, pct));
+      }, [completedModules]);
+
+      const handleModuleSelect = (moduleIndex) => {
+        setCurrentModule(moduleIndex);
+        setCurrentCard(0);
+        setCurrentView('module');
+      };
+
+      const handleCardNext = () => {
+        if (currentCard < currentModuleData.cards.length - 1) {
+          setCurrentCard(currentCard + 1);
+        } else {
+          // Module completed
+          const newCompletedModules = [...completedModules];
+          if (!newCompletedModules.includes(currentModule)) {
+            newCompletedModules.push(currentModule);
+          }
+          
+          setProgress({
+            ...progress,
+            completedModules: newCompletedModules,
+            moduleProgress: {
+              ...moduleProgress,
+              [currentModule]: { completedCards: currentModuleData.cards.length }
+            }
+          });
+
+          if (currentModule < COURSE_DATA.modules.length - 1) {
+            setCurrentModule(currentModule + 1);
+            setCurrentCard(0);
+          } else {
+            // All modules completed
+            setProgress({
+              ...progress,
+              completedModules: newCompletedModules,
+              completionDate: new Date().toISOString()
+            });
+            setCurrentView('certificate');
+          }
+        }
+      };
+
+      const handleCardBack = () => {
+        if (currentCard > 0) {
+          setCurrentCard(currentCard - 1);
+        } else if (currentModule > 0) {
+          setCurrentModule(currentModule - 1);
+          setCurrentCard(COURSE_DATA.modules[currentModule - 1].cards.length - 1);
+        }
+      };
+
+      const handleQuizAnswer = (answerIndex) => {
+        const cardKey = `${currentModule}-${currentCard}`;
+        setProgress({
+          ...progress,
+          quizAnswers: {
+            ...quizAnswers,
+            [cardKey]: answerIndex
+          }
+        });
+      };
+
+      const handleNotesChange = (value) => {
+        const cardKey = `${currentModule}-${currentCard}`;
+        setProgress({
+          ...progress,
+          notes: {
+            ...notes,
+            [cardKey]: value
+          }
+        });
+      };
+
+      // Keyboard navigation
+      useEffect(() => {
+        const handleKeyPress = (e) => {
+          if (currentView === 'module') {
+            if (e.key === 'ArrowRight') handleCardNext();
+            if (e.key === 'ArrowLeft') handleCardBack();
+          }
+        };
+        window.addEventListener('keydown', handleKeyPress);
+        return () => window.removeEventListener('keydown', handleKeyPress);
+      }, [currentView, currentModule, currentCard]);
+
+      // Overview Screen
+      if (currentView === 'overview') {
+        return (
+          <div className="min-h-screen p-6">
+            <div className="max-w-6xl mx-auto">
+              {/* Header */}
+              <div className="text-center mb-12">
+                <div className="erasmus-gradient text-white py-8 px-6 rounded-2xl mb-6">
+                  <h1 className="text-3xl font-bold mb-2">{COURSE_DATA.title}</h1>
+                  <p className="text-blue-100 text-lg">{COURSE_DATA.subtitle}</p>
+                  <div className="mt-4 flex items-center justify-center gap-4 text-sm">
+                    <span className="bg-white/20 px-3 py-1 rounded-full">Duration: {COURSE_DATA.duration}</span>
+                    <span className="bg-white/20 px-3 py-1 rounded-full">Self-paced Learning</span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-center gap-8 mb-8">
+                  <div className="text-center">
+                    <ProgressRing progress={overallProgress} size={80} />
+                    <p className="text-sm text-gray-600 mt-2">Overall Progress</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-gray-900">{completedModules.length}</div>
+                    <p className="text-sm text-gray-600">Modules Completed</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-gray-900">{COURSE_DATA.modules.length}</div>
+                    <p className="text-sm text-gray-600">Total Modules</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modules Grid */}
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                {COURSE_DATA.modules.map((module, index) => (
+                  <ModuleCard
+                    key={module.id}
+                    module={module}
+                    isCompleted={completedModules.includes(index)}
+                    isCurrent={index === currentModule}
+                    onClick={() => handleModuleSelect(index)}
+                  />
+                ))}
+              </div>
+
+              {/* Course Information */}
+              <div className="bg-white rounded-xl p-6 border border-gray-200">
+                <h2 className="text-xl font-semibold mb-4">About This Course</h2>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-2">Learning Objectives</h3>
+                    <ul className="text-sm text-gray-600 space-y-1">
+                      <li>• Understand forced labour definitions and scope</li>
+                      <li>• Identify risk factors and warning signs</li>
+                      <li>• Map supply chains and assess risks</li>
+                      <li>• Apply legal frameworks and standards</li>
+                      <li>• Develop prevention and action strategies</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-2">Target Audience</h3>
+                    <ul className="text-sm text-gray-600 space-y-1">
+                      <li>• Business professionals and managers</li>
+                      <li>• Supply chain specialists</li>
+                      <li>• Human rights advocates</li>
+                      <li>• Students and researchers</li>
+                      <li>• Policy makers and regulators</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Module Screen
+      if (currentView === 'module') {
+        return (
+          <div className="min-h-screen p-6">
+            <div className="max-w-4xl mx-auto">
+              {/* Module Header */}
+              <div className="mb-6">
+                <button 
+                  onClick={() => setCurrentView('overview')}
+                  className="text-blue-600 hover:text-blue-800 mb-4 flex items-center gap-2"
+                >
+                  ← Back to Course Overview
+                </button>
+                
+                <div className="bg-white rounded-xl p-6 border border-gray-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-lg bg-gradient-to-r ${
+                        currentModuleData.color === 'blue' ? 'from-blue-500 to-blue-600' :
+                        currentModuleData.color === 'orange' ? 'from-orange-500 to-orange-600' :
+                        currentModuleData.color === 'green' ? 'from-green-500 to-green-600' :
+                        currentModuleData.color === 'purple' ? 'from-purple-500 to-purple-600' :
+                        'from-red-500 to-red-600'
+                      } flex items-center justify-center text-white text-xl`}>
+                        {currentModuleData.icon}
+                      </div>
+                      <div>
+                        <h1 className="text-2xl font-bold text-gray-900">{currentModuleData.title}</h1>
+                        <p className="text-gray-600">{currentModuleData.subtitle}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm text-gray-500">Module {currentModule + 1} of {COURSE_DATA.modules.length}</div>
+                      <div className="text-sm text-gray-500">Card {currentCard + 1} of {currentModuleData.cards.length}</div>
+                    </div>
+                  </div>
+                  
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${((currentCard + 1) / currentModuleData.cards.length) * 100}%` }}
+                    ></div>
+                  </div>
+                  <div className="mt-4 flex items-center justify-end">
+                    <button onClick={() => setCurrentView('quiz')} className="px-5 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">Start 5-question Quiz</button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card Content */}
+              <div className="card-transition mb-6">
+                {currentCardData?.type === 'definition' && (
+                  <DefinitionCard card={currentCardData} />
+                )}
+                
+                {currentCardData?.type === 'quiz' && (
+                  <QuizCard 
+                    card={currentCardData}
+                    userAnswer={quizAnswers[`${currentModule}-${currentCard}`]}
+                    onAnswer={handleQuizAnswer}
+                  />
+                )}
+                
+                {currentCardData?.type === 'reflection' && (
+                  <ReflectionCard
+                    card={currentCardData}
+                    userNotes={notes[`${currentModule}-${currentCard}`]}
+                    onNotesChange={handleNotesChange}
+                  />
+                )}
+              </div>
+
+              {/* Navigation */}
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={handleCardBack}
+                  disabled={currentModule === 0 && currentCard === 0}
+                  className="px-6 py-3 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Previous
+                </button>
+                
+                <div className="text-sm text-gray-500">
+                  Use arrow keys to navigate
+                </div>
+                
+                <button
+                  onClick={handleCardNext}
+                  className="px-6 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                >
+                  {currentCard === currentModuleData.cards.length - 1 ? 'Complete Module' : 'Next'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Timed Quiz Screen per module
+      if (currentView === 'quiz') {
+        return (
+          <div className="min-h-screen p-6">
+            <div className="max-w-3xl mx-auto">
+              <button 
+                onClick={() => setCurrentView('module')}
+                className="text-blue-600 hover:text-blue-800 mb-4 flex items-center gap-2"
+              >
+                ← Back to Module
+              </button>
+              <TimedQuiz 
+                moduleIndex={currentModule}
+                onComplete={() => {
+                  // mark module completed after quiz
+                  const newCompletedModules = [...completedModules];
+                  if (!newCompletedModules.includes(currentModule)) newCompletedModules.push(currentModule);
+                  setProgress({
+                    ...progress,
+                    completedModules: newCompletedModules,
+                    moduleProgress: { ...moduleProgress, [currentModule]: { completedCards: (COURSE_DATA.modules[currentModule]?.cards.length || 0) } }
+                  });
+                  if (currentModule < COURSE_DATA.modules.length - 1) {
+                    setCurrentModule(currentModule + 1);
+                    setCurrentCard(0);
+                    setCurrentView('module');
+                  } else {
+                    setCurrentView('certificate');
+                  }
+                }}
+              />
+            </div>
+          </div>
+        );
+      }
+
+      // Certificate Screen
+      if (currentView === 'certificate') {
+        return (
+          <div className="min-h-screen p-6 bg-gradient-to-br from-green-50 to-blue-50">
+            <div className="max-w-2xl mx-auto">
+              <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-lg text-center">
+                <div className="w-20 h-20 bg-green-600 rounded-full flex items-center justify-center text-white text-3xl mx-auto mb-6">
+                  🏆
+                </div>
+                
+                <h1 className="text-3xl font-bold text-gray-900 mb-4">Congratulations!</h1>
+                <p className="text-lg text-gray-600 mb-6">
+                  You have successfully completed the Erasmus+ Forced Labour Training Course
+                </p>
+                
+                <div className="bg-gray-50 rounded-lg p-6 mb-6">
+                  <h2 className="text-xl font-semibold mb-4">Course Completion Certificate</h2>
+                  <div className="space-y-2 text-sm text-gray-600">
+                    <p><span className="font-medium">Course:</span> {COURSE_DATA.title}</p>
+                    <p><span className="font-medium">Duration:</span> {COURSE_DATA.duration}</p>
+                    <p><span className="font-medium">Modules Completed:</span> {COURSE_DATA.modules.length}</p>
+                    <p><span className="font-medium">Completion Date:</span> {new Date().toLocaleDateString()}</p>
+                  </div>
+                </div>
+                
+                <div className="flex gap-4 justify-center">
+                  <button
+                    onClick={() => {
+                      setCurrentView('overview');
+                      setCurrentModule(0);
+                      setCurrentCard(0);
+                    }}
+                    className="px-6 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                  >
+                    Review Course
+                  </button>
+                  <button
+                    onClick={() => {
+                      // In a real app, this would generate and download a PDF certificate
+                      alert('Certificate download feature would be implemented here');
+                    }}
+                    className="px-6 py-3 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
+                  >
+                    Download Certificate
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      return null;
+    }
+
+    // Error Boundary
     class ErrorBoundary extends React.Component {
       constructor(props) {
         super(props);
@@ -230,206 +1016,31 @@
       static getDerivedStateFromError() { return { hasError: true }; }
       componentDidCatch(err) { console.error('App error', err); }
       render() {
-        if (this.state.hasError) return <div className="p-4 text-red-600">Something went wrong. Please refresh the page.</div>;
+        if (this.state.hasError) {
+          return (
+            <div className="min-h-screen flex items-center justify-center p-4">
+              <div className="text-center">
+                <h1 className="text-xl font-semibold text-red-600 mb-2">Something went wrong</h1>
+                <p className="text-gray-600 mb-4">Please refresh the page to try again.</p>
+                <button 
+                  onClick={() => window.location.reload()}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Refresh Page
+                </button>
+              </div>
+            </div>
+          );
+        }
         return this.props.children;
       }
     }
 
-    function ForcedLabourMicroApp() {
-      const [state, setState] = useLocalStorage('microlearning:progress', {
-        moduleIndex: 0,
-        cardIndex: 0,
-        notes: {},
-        checks: {},
-        completed: false,
-        choices: {},
-        quizAnswers: {}
-      });
-
-      const { moduleIndex, cardIndex, notes, checks, completed, choices, quizAnswers } = state;
-
-      const mod = LESSONS[moduleIndex];
-      const card = mod && mod.cards[cardIndex];
-      const totalCards = LESSONS.reduce((acc, m) => acc + m.cards.length, 0);
-
-      const currentFlatIndex = useMemo(() => {
-        let n = 0;
-        for (let i = 0; i < moduleIndex; i++) n += LESSONS[i].cards.length;
-        return n + cardIndex + 1;
-      }, [moduleIndex, cardIndex]);
-
-      // keyboard navigation
-      useEffect(() => {
-        function onKey(e) {
-          if (e.key === 'ArrowRight') next();
-          if (e.key === 'ArrowLeft') back();
-        }
-        window.addEventListener('keydown', onKey);
-        return () => window.removeEventListener('keydown', onKey);
-      }, [moduleIndex, cardIndex, mod]);
-
-      const set = useCallback((patch) => setState(prev => ({ ...prev, ...patch })), [setState]);
-
-      const next = useCallback(() => {
-        if (!mod) return;
-        if (moduleIndex === LESSONS.length - 1 && cardIndex === mod.cards.length - 1) {
-          set({ completed: true });
-          return;
-        }
-        if (cardIndex < mod.cards.length - 1) set({ cardIndex: cardIndex + 1 });
-        else set({ moduleIndex: moduleIndex + 1, cardIndex: 0 });
-      }, [moduleIndex, cardIndex, mod, set]);
-
-      const back = useCallback(() => {
-        if (moduleIndex === 0 && cardIndex === 0) return;
-        if (cardIndex > 0) set({ cardIndex: cardIndex - 1 });
-        else {
-          const prevModuleIndex = moduleIndex - 1;
-          set({ moduleIndex: prevModuleIndex, cardIndex: LESSONS[prevModuleIndex].cards.length - 1 });
-        }
-      }, [moduleIndex, cardIndex, set]);
-
-      if (!mod || !card) return <div className="p-4">loading…</div>;
-
-      if (completed) {
-        return (
-          <div className="min-h-screen w-full bg-white text-gray-900 flex items-center justify-center p-4">
-            <div className="w-full max-w-lg mx-auto">
-              <h1 className="text-2xl font-semibold mb-2">Nice — you finished the micro‑course ✨</h1>
-              <p className="text-gray-600 mb-4">pick what you’ll do next (this week):</p>
-              <div className="grid gap-2 mb-6">
-                {[{ key: 'video', label: 'make a 60–90s explainer video' }, { key: 'toolkit', label: 'write 1 mini activity for classmates' }, { key: 'campaign', label: 'post a 3‑tile info set (story/feed)' }, { key: 'workshop', label: 'host a 30‑min micro‑workshop' }].map(o => (
-                  <label key={o.key} className="flex items-center gap-2 p-3 border rounded-xl hover:bg-gray-50">
-                    <input type="checkbox" checked={!!choices[o.key]} onChange={(e) => set({ choices: { ...choices, [o.key]: e.target.checked } })} />
-                    <span>{o.label}</span>
-                  </label>
-                ))}
-              </div>
-              <div className="p-3 rounded-xl bg-gray-50 border">
-                <p className="text-sm text-gray-700 mb-2">write 1 sentence you’ll share with friends:</p>
-                <textarea className="w-full p-2 rounded-md border focus:outline-none" rows="3" placeholder="12 words max — clear + kind." value={notes.pledge || ''} onChange={(e) => set({ notes: { ...notes, pledge: e.target.value } })} />
-              </div>
-              <div className="mt-6 flex items-center gap-3">
-                <button onClick={() => setState({ moduleIndex: 0, cardIndex: 0, notes: {}, checks: {}, completed: false, choices: {}, quizAnswers: {} })} className="px-4 py-2 rounded-xl border bg-black text-white">restart</button>
-                <button onClick={() => { const payload = { choices, notes, quizAnswers }; if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(JSON.stringify(payload, null, 2)); alert('saved summary to clipboard ✔'); } else { alert('copy not supported on this device'); } }} className="px-4 py-2 rounded-xl border">copy summary</button>
-              </div>
-            </div>
-          </div>
-        );
-      }
-
-      return (
-        <div className="min-h-screen w-full bg-white text-gray-900 p-4">
-          <div className="max-w-lg mx-auto">
-            <header className="mb-4">
-              <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-semibold">Forced Labour — Microlearning</h1>
-                  <Badge>{mod.estMin} min</Badge>
-                </div>
-                <Badge>{currentFlatIndex}/{totalCards}</Badge>
-              </div>
-              <ProgressBar value={currentFlatIndex} max={totalCards} />
-              <div className="mt-2 text-sm muted flex items-center gap-2"><span className="font-medium">{mod.title}</span></div>
-            </header>
-
-            <main className="card-transition mb-4 p-4 rounded-2xl border shadow-sm bg-white card" aria-live="polite">
-              {card.type === 'text' && (
-                <div>
-                  <h2 className="text-lg font-semibold mb-2">{card.heading}</h2>
-                  <p className="leading-relaxed text-gray-800">{card.body}</p>
-                </div>
-              )}
-
-              {card.type === 'quiz' && (
-                <div>
-                  <h2 className="text-lg font-semibold mb-2">quiz</h2>
-                  <p className="mb-3 text-gray-800">{card.question}</p>
-                  <div className="grid gap-2">
-                    {card.options.map((opt, idx) => {
-                      const key = mod.id + '-' + cardIndex;
-                      const picked = quizAnswers[key] === idx;
-                      const isCorrect = idx === card.answerIndex;
-                      return (
-                        <button key={idx} onClick={() => set({ quizAnswers: { ...quizAnswers, [key]: idx } })} className={'text-left p-3 rounded-xl border hover:bg-gray-50 ' + (picked ? (isCorrect ? 'border-green-600' : 'border-red-600') : '')}>
-                          {opt}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {(function(){ const key = mod.id + '-' + cardIndex; const ans = quizAnswers[key]; if (ans == null) return null; const correct = ans === card.answerIndex; return <p className={'mt-3 text-sm ' + (correct ? 'text-green-700' : 'text-red-700')}>{correct ? 'nice ✔ correct.' : 'not quite.'} {card.explain}</p>; })()}
-                </div>
-              )}
-
-              {card.type === 'reflect' && (
-                <div>
-                  <h2 className="text-lg font-semibold mb-2">reflect</h2>
-                  <p className="mb-2 text-gray-800">{card.prompt}</p>
-                  <textarea className="w-full p-3 rounded-xl border focus:outline-none" rows="4" placeholder="write like you text a friend — short is fine." value={notes[mod.id + '-' + cardIndex] || ''} onChange={(e) => set({ notes: { ...notes, [mod.id + '-' + cardIndex]: e.target.value } })} />
-                </div>
-              )}
-
-              {card.type === 'action' && (
-                <div>
-                  <h2 className="text-lg font-semibold mb-2">{card.heading}</h2>
-                  <div className="grid gap-2">
-                    {card.checklist.map((item, i) => {
-                      const key = mod.id + '-' + cardIndex + '-' + i;
-                      return (
-                        <label key={key} className="flex items-center gap-2 p-3 border rounded-xl hover:bg-gray-50">
-                          <input type="checkbox" checked={!!checks[key]} onChange={(e) => set({ checks: { ...checks, [key]: e.target.checked } })} />
-                          <span>{item}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {card.type === 'osint' && (
-                <div>
-                  <h2 className="text-lg font-semibold mb-2">{card.heading}</h2>
-                  <ol className="list-decimal pl-5 space-y-2 text-gray-800">{card.steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
-                  <p className="mt-3 text-sm text-gray-600">note: always keep safety, legality, and privacy in mind.</p>
-                </div>
-              )}
-
-              {card.type === 'choice' && (
-                <div>
-                  <h2 className="text-lg font-semibold mb-2">{card.heading}</h2>
-                  <div className="grid gap-2">
-                    {card.choices.map((c) => (
-                      <label key={c.key} className="flex items-center gap-2 p-3 border rounded-xl hover:bg-gray-50">
-                        <input type="checkbox" checked={!!choices[c.key]} onChange={(e) => set({ choices: { ...choices, [c.key]: e.target.checked } })} />
-                        <span>{c.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </main>
-
-            <nav className="flex items-center justify-between">
-              <button onClick={back} aria-label="Previous card" className="px-4 py-2 rounded-xl border">back</button>
-              <div className="text-sm text-gray-500">module {moduleIndex + 1}/{LESSONS.length} · card {cardIndex + 1}/{mod.cards.length}</div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => { navigator.clipboard && navigator.clipboard.writeText && navigator.clipboard.writeText(JSON.stringify({ moduleIndex, cardIndex, notes, checks, choices, quizAnswers }, null, 2)); }} className="px-3 py-2 rounded-xl border">save</button>
-                <button onClick={next} aria-label="Next card" className="px-4 py-2 rounded-xl border bg-black text-white">next</button>
-              </div>
-            </nav>
-
-            <footer className="mt-6 text-xs text-gray-500"> 
-              <p>tip: use arrow keys to navigate. keep language simple. share sources from trusted orgs. protect people’s privacy.</p>
-            </footer>
-          </div>
-        </div>
-      );
-    }
-
+    // Render App
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(
       <ErrorBoundary>
-        <ForcedLabourMicroApp />
+        <ErasmusTrainingApp />
       </ErrorBoundary>
     );
   </script>
