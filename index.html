@@ -3,13 +3,24 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>forced labour — microlearning</title>
+  <meta name="description" content="Interactive microlearning about forced labour - learn about signs, prevention, and action steps" />
+  <title>Forced Labour — Microlearning</title>
+  <link rel="preconnect" href="https://unpkg.com">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     html, body { height: 100%; }
-    body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+    body { 
+      -webkit-font-smoothing: antialiased; 
+      -moz-osx-font-smoothing: grayscale;
+    }
+    .card-transition { transition: opacity 0.25s ease-in-out, transform 0.25s ease-in-out; }
+    :focus { outline: 3px solid rgba(0,0,0,0.9); outline-offset: 3px; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #0b1220; color: #e6eef8; }
+      .card { background: #071126; }
+      .muted { color: #9aa8bf; }
+    }
   </style>
-  <!-- React + Babel (so this file works as-is) -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -18,9 +29,30 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useMemo } = React;
+    const { useState, useEffect, useMemo, useCallback } = React;
 
-    // content
+    // localStorage hook for persistence
+    function useLocalStorage(key, initialValue) {
+      const [state, setState] = useState(() => {
+        try {
+          const raw = window.localStorage.getItem(key);
+          return raw ? JSON.parse(raw) : initialValue;
+        } catch (e) {
+          console.error('localStorage read failed', e);
+          return initialValue;
+        }
+      });
+      useEffect(() => {
+        try {
+          window.localStorage.setItem(key, JSON.stringify(state));
+        } catch (e) {
+          console.error('localStorage write failed', e);
+        }
+      }, [key, state]);
+      return [state, setState];
+    }
+
+    // LESSONS data (kept inline so the file remains a single static page)
     const LESSONS = [
       {
         id: "m1",
@@ -175,108 +207,111 @@
       }
     ];
 
-    function ProgressBar({ value, max }) {
+    // Progress bar with ARIA
+    const ProgressBar = React.memo(function ProgressBar({ value, max }) {
       const pct = Math.round((value / Math.max(1, max)) * 100);
       return (
-        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+        <div role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
           <div className="h-full bg-black/80 transition-all" style={{ width: pct + '%' }} />
         </div>
       );
-    }
+    });
 
-    function Badge({ children }) {
-      return (
-        <span className="px-2 py-0.5 text-xs rounded-full bg-gray-100 border border-gray-200">
-          {children}
-        </span>
-      );
+    const Badge = React.memo(function Badge({ children }) {
+      return <span className="px-2 py-0.5 text-xs rounded-full bg-gray-100 border border-gray-200">{children}</span>;
+    });
+
+    // Error boundary for better error handling
+    class ErrorBoundary extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false };
+      }
+      static getDerivedStateFromError() { return { hasError: true }; }
+      componentDidCatch(err) { console.error('App error', err); }
+      render() {
+        if (this.state.hasError) return <div className="p-4 text-red-600">Something went wrong. Please refresh the page.</div>;
+        return this.props.children;
+      }
     }
 
     function ForcedLabourMicroApp() {
-      const [moduleIndex, setModuleIndex] = useState(0);
-      const [cardIndex, setCardIndex] = useState(0);
-      const [notes, setNotes] = useState({});
-      const [checks, setChecks] = useState({});
-      const [completed, setCompleted] = useState(false);
-      const [choices, setChoices] = useState({});
-      const [quizAnswers, setQuizAnswers] = useState({});
+      const [state, setState] = useLocalStorage('microlearning:progress', {
+        moduleIndex: 0,
+        cardIndex: 0,
+        notes: {},
+        checks: {},
+        completed: false,
+        choices: {},
+        quizAnswers: {}
+      });
+
+      const { moduleIndex, cardIndex, notes, checks, completed, choices, quizAnswers } = state;
 
       const mod = LESSONS[moduleIndex];
-      const card = mod.cards[cardIndex];
+      const card = mod && mod.cards[cardIndex];
       const totalCards = LESSONS.reduce((acc, m) => acc + m.cards.length, 0);
+
       const currentFlatIndex = useMemo(() => {
         let n = 0;
-        LESSONS.forEach((m, i) => { if (i < moduleIndex) n += m.cards.length; });
+        for (let i = 0; i < moduleIndex; i++) n += LESSONS[i].cards.length;
         return n + cardIndex + 1;
       }, [moduleIndex, cardIndex]);
 
-      function next() {
+      // keyboard navigation
+      useEffect(() => {
+        function onKey(e) {
+          if (e.key === 'ArrowRight') next();
+          if (e.key === 'ArrowLeft') back();
+        }
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+      }, [moduleIndex, cardIndex, mod]);
+
+      const set = useCallback((patch) => setState(prev => ({ ...prev, ...patch })), [setState]);
+
+      const next = useCallback(() => {
+        if (!mod) return;
         if (moduleIndex === LESSONS.length - 1 && cardIndex === mod.cards.length - 1) {
-          setCompleted(true);
+          set({ completed: true });
           return;
         }
-        if (cardIndex < mod.cards.length - 1) setCardIndex(cardIndex + 1);
-        else { setModuleIndex(moduleIndex + 1); setCardIndex(0); }
-      }
-      function back() {
+        if (cardIndex < mod.cards.length - 1) set({ cardIndex: cardIndex + 1 });
+        else set({ moduleIndex: moduleIndex + 1, cardIndex: 0 });
+      }, [moduleIndex, cardIndex, mod, set]);
+
+      const back = useCallback(() => {
         if (moduleIndex === 0 && cardIndex === 0) return;
-        if (cardIndex > 0) setCardIndex(cardIndex - 1);
+        if (cardIndex > 0) set({ cardIndex: cardIndex - 1 });
         else {
-          const prevModule = LESSONS[moduleIndex - 1];
-          setModuleIndex(moduleIndex - 1);
-          setCardIndex(prevModule.cards.length - 1);
+          const prevModuleIndex = moduleIndex - 1;
+          set({ moduleIndex: prevModuleIndex, cardIndex: LESSONS[prevModuleIndex].cards.length - 1 });
         }
-      }
+      }, [moduleIndex, cardIndex, set]);
+
+      if (!mod || !card) return <div className="p-4">loading…</div>;
 
       if (completed) {
         return (
           <div className="min-h-screen w-full bg-white text-gray-900 flex items-center justify-center p-4">
             <div className="w-full max-w-lg mx-auto">
-              <h1 className="text-2xl font-semibold mb-2">nice — you finished the micro‑course ✨</h1>
+              <h1 className="text-2xl font-semibold mb-2">Nice — you finished the micro‑course ✨</h1>
               <p className="text-gray-600 mb-4">pick what you’ll do next (this week):</p>
               <div className="grid gap-2 mb-6">
-                {[
-                  { key: "video", label: "make a 60–90s explainer video" },
-                  { key: "toolkit", label: "write 1 mini activity for classmates" },
-                  { key: "campaign", label: "post a 3‑tile info set (story/feed)" },
-                  { key: "workshop", label: "host a 30‑min micro‑workshop" }
-                ].map(o => (
+                {[{ key: 'video', label: 'make a 60–90s explainer video' }, { key: 'toolkit', label: 'write 1 mini activity for classmates' }, { key: 'campaign', label: 'post a 3‑tile info set (story/feed)' }, { key: 'workshop', label: 'host a 30‑min micro‑workshop' }].map(o => (
                   <label key={o.key} className="flex items-center gap-2 p-3 border rounded-xl hover:bg-gray-50">
-                    <input
-                      type="checkbox"
-                      checked={!!choices[o.key]}
-                      onChange={(e) => setChoices({ ...choices, [o.key]: e.target.checked })}
-                    />
+                    <input type="checkbox" checked={!!choices[o.key]} onChange={(e) => set({ choices: { ...choices, [o.key]: e.target.checked } })} />
                     <span>{o.label}</span>
                   </label>
                 ))}
               </div>
               <div className="p-3 rounded-xl bg-gray-50 border">
                 <p className="text-sm text-gray-700 mb-2">write 1 sentence you’ll share with friends:</p>
-                <textarea
-                  className="w-full p-2 rounded-md border focus:outline-none"
-                  rows="3"
-                  placeholder="12 words max — clear + kind."
-                  onChange={(e) => setNotes({ ...notes, pledge: e.target.value })}
-                />
+                <textarea className="w-full p-2 rounded-md border focus:outline-none" rows="3" placeholder="12 words max — clear + kind." value={notes.pledge || ''} onChange={(e) => set({ notes: { ...notes, pledge: e.target.value } })} />
               </div>
               <div className="mt-6 flex items-center gap-3">
-                <button
-                  onClick={() => { setModuleIndex(0); setCardIndex(0); setCompleted(false); }}
-                  className="px-4 py-2 rounded-xl border bg-black text-white"
-                >restart</button>
-                <button
-                  onClick={() => {
-                    const payload = { choices, notes, quizAnswers };
-                    if (navigator.clipboard && navigator.clipboard.writeText) {
-                      navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
-                      alert("saved summary to clipboard ✔");
-                    } else {
-                      alert("copy not supported on this device");
-                    }
-                  }}
-                  className="px-4 py-2 rounded-xl border"
-                >copy summary</button>
+                <button onClick={() => setState({ moduleIndex: 0, cardIndex: 0, notes: {}, checks: {}, completed: false, choices: {}, quizAnswers: {} })} className="px-4 py-2 rounded-xl border bg-black text-white">restart</button>
+                <button onClick={() => { const payload = { choices, notes, quizAnswers }; if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(JSON.stringify(payload, null, 2)); alert('saved summary to clipboard ✔'); } else { alert('copy not supported on this device'); } }} className="px-4 py-2 rounded-xl border">copy summary</button>
               </div>
             </div>
           </div>
@@ -286,87 +321,63 @@
       return (
         <div className="min-h-screen w-full bg-white text-gray-900 p-4">
           <div className="max-w-lg mx-auto">
-            <div className="mb-4">
+            <header className="mb-4">
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-semibold">forced labour — microlearning</h1>
+                  <h1 className="text-xl font-semibold">Forced Labour — Microlearning</h1>
                   <Badge>{mod.estMin} min</Badge>
                 </div>
                 <Badge>{currentFlatIndex}/{totalCards}</Badge>
               </div>
               <ProgressBar value={currentFlatIndex} max={totalCards} />
-              <div className="mt-2 text-sm text-gray-600 flex items-center gap-2">
-                <span className="font-medium">{mod.title}</span>
-              </div>
-            </div>
+              <div className="mt-2 text-sm muted flex items-center gap-2"><span className="font-medium">{mod.title}</span></div>
+            </header>
 
-            <div className="mb-4 p-4 rounded-2xl border shadow-sm bg-white">
-              {card.type === "text" && (
+            <main className="card-transition mb-4 p-4 rounded-2xl border shadow-sm bg-white card" aria-live="polite">
+              {card.type === 'text' && (
                 <div>
                   <h2 className="text-lg font-semibold mb-2">{card.heading}</h2>
                   <p className="leading-relaxed text-gray-800">{card.body}</p>
                 </div>
               )}
 
-              {card.type === "quiz" && (
+              {card.type === 'quiz' && (
                 <div>
                   <h2 className="text-lg font-semibold mb-2">quiz</h2>
                   <p className="mb-3 text-gray-800">{card.question}</p>
                   <div className="grid gap-2">
                     {card.options.map((opt, idx) => {
-                      const key = mod.id + "-" + cardIndex;
+                      const key = mod.id + '-' + cardIndex;
                       const picked = quizAnswers[key] === idx;
                       const isCorrect = idx === card.answerIndex;
                       return (
-                        <button
-                          key={idx}
-                          onClick={() => setQuizAnswers({ ...quizAnswers, [key]: idx })}
-                          className={"text-left p-3 rounded-xl border hover:bg-gray-50 " + (picked ? (isCorrect ? "border-green-600" : "border-red-600") : "")}
-                        >
+                        <button key={idx} onClick={() => set({ quizAnswers: { ...quizAnswers, [key]: idx } })} className={'text-left p-3 rounded-xl border hover:bg-gray-50 ' + (picked ? (isCorrect ? 'border-green-600' : 'border-red-600') : '')}>
                           {opt}
                         </button>
                       );
                     })}
                   </div>
-                  {(function(){
-                    const key = mod.id + "-" + cardIndex;
-                    const ans = quizAnswers[key];
-                    if (ans == null) return null;
-                    const correct = ans === card.answerIndex;
-                    return <p className={"mt-3 text-sm " + (correct ? "text-green-700" : "text-red-700")}>
-                      {correct ? "nice ✔ correct." : "not quite."} {card.explain}
-                    </p>;
-                  })()}
+                  {(function(){ const key = mod.id + '-' + cardIndex; const ans = quizAnswers[key]; if (ans == null) return null; const correct = ans === card.answerIndex; return <p className={'mt-3 text-sm ' + (correct ? 'text-green-700' : 'text-red-700')}>{correct ? 'nice ✔ correct.' : 'not quite.'} {card.explain}</p>; })()}
                 </div>
               )}
 
-              {card.type === "reflect" && (
+              {card.type === 'reflect' && (
                 <div>
                   <h2 className="text-lg font-semibold mb-2">reflect</h2>
                   <p className="mb-2 text-gray-800">{card.prompt}</p>
-                  <textarea
-                    className="w-full p-3 rounded-xl border focus:outline-none"
-                    rows="4"
-                    placeholder="write like you text a friend — short is fine."
-                    value={notes[mod.id + "-" + cardIndex] || ""}
-                    onChange={(e) => setNotes({ ...notes, [mod.id + "-" + cardIndex]: e.target.value })}
-                  />
+                  <textarea className="w-full p-3 rounded-xl border focus:outline-none" rows="4" placeholder="write like you text a friend — short is fine." value={notes[mod.id + '-' + cardIndex] || ''} onChange={(e) => set({ notes: { ...notes, [mod.id + '-' + cardIndex]: e.target.value } })} />
                 </div>
               )}
 
-              {card.type === "action" && (
+              {card.type === 'action' && (
                 <div>
                   <h2 className="text-lg font-semibold mb-2">{card.heading}</h2>
                   <div className="grid gap-2">
                     {card.checklist.map((item, i) => {
-                      const key = mod.id + "-" + cardIndex + "-" + i;
+                      const key = mod.id + '-' + cardIndex + '-' + i;
                       return (
                         <label key={key} className="flex items-center gap-2 p-3 border rounded-xl hover:bg-gray-50">
-                          <input
-                            type="checkbox"
-                            checked={!!checks[key]}
-                            onChange={(e) => setChecks({ ...checks, [key]: e.target.checked })}
-                          />
+                          <input type="checkbox" checked={!!checks[key]} onChange={(e) => set({ checks: { ...checks, [key]: e.target.checked } })} />
                           <span>{item}</span>
                         </label>
                       );
@@ -375,51 +386,52 @@
                 </div>
               )}
 
-              {card.type === "osint" && (
+              {card.type === 'osint' && (
                 <div>
                   <h2 className="text-lg font-semibold mb-2">{card.heading}</h2>
-                <ol className="list-decimal pl-5 space-y-2 text-gray-800">
-                    {card.steps.map((s, i) => <li key={i}>{s}</li>)}
-                  </ol>
+                  <ol className="list-decimal pl-5 space-y-2 text-gray-800">{card.steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
                   <p className="mt-3 text-sm text-gray-600">note: always keep safety, legality, and privacy in mind.</p>
                 </div>
               )}
 
-              {card.type === "choice" && (
+              {card.type === 'choice' && (
                 <div>
                   <h2 className="text-lg font-semibold mb-2">{card.heading}</h2>
                   <div className="grid gap-2">
                     {card.choices.map((c) => (
                       <label key={c.key} className="flex items-center gap-2 p-3 border rounded-xl hover:bg-gray-50">
-                        <input
-                          type="checkbox"
-                          checked={!!choices[c.key]}
-                          onChange={(e) => setChoices({ ...choices, [c.key]: e.target.checked })}
-                        />
+                        <input type="checkbox" checked={!!choices[c.key]} onChange={(e) => set({ choices: { ...choices, [c.key]: e.target.checked } })} />
                         <span>{c.label}</span>
                       </label>
                     ))}
                   </div>
                 </div>
               )}
-            </div>
+            </main>
 
-            <div className="flex items-center justify-between">
-              <button onClick={back} className="px-4 py-2 rounded-xl border">back</button>
+            <nav className="flex items-center justify-between">
+              <button onClick={back} aria-label="Previous card" className="px-4 py-2 rounded-xl border">back</button>
               <div className="text-sm text-gray-500">module {moduleIndex + 1}/{LESSONS.length} · card {cardIndex + 1}/{mod.cards.length}</div>
-              <button onClick={next} className="px-4 py-2 rounded-xl border bg-black text-white">next</button>
-            </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => { navigator.clipboard && navigator.clipboard.writeText && navigator.clipboard.writeText(JSON.stringify({ moduleIndex, cardIndex, notes, checks, choices, quizAnswers }, null, 2)); }} className="px-3 py-2 rounded-xl border">save</button>
+                <button onClick={next} aria-label="Next card" className="px-4 py-2 rounded-xl border bg-black text-white">next</button>
+              </div>
+            </nav>
 
-            <div className="mt-6 text-xs text-gray-500">
-              <p>tip: keep language simple. share sources from trusted orgs. protect people’s privacy.</p>
-            </div>
+            <footer className="mt-6 text-xs text-gray-500"> 
+              <p>tip: use arrow keys to navigate. keep language simple. share sources from trusted orgs. protect people’s privacy.</p>
+            </footer>
           </div>
         </div>
       );
     }
 
-    const root = ReactDOM.createRoot(document.getElementById("root"));
-    root.render(<ForcedLabourMicroApp />);
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(
+      <ErrorBoundary>
+        <ForcedLabourMicroApp />
+      </ErrorBoundary>
+    );
   </script>
 </body>
 </html>
